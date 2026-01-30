@@ -3,205 +3,412 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VPN Service - 3X-UI</title>
+    <title>🚀 VPN Сервис | Полностью автоматический</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body { font-family: Arial; padding: 20px; background: #f5f5f5; }
-        .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
-        .btn { background: #007bff; color: white; border: none; padding: 15px 30px; border-radius: 5px; cursor: pointer; }
-        .result { margin-top: 20px; padding: 15px; background: #e9ecef; border-radius: 5px; display: none; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 24px;
+            width: 100%;
+            max-width: 500px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+        
+        .logo-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+            color: #10b981;
+        }
+        
+        .logo h1 {
+            font-size: 32px;
+            font-weight: 800;
+            margin-bottom: 8px;
+        }
+        
+        .logo p {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 40px 30px;
+        }
+        
+        .info-card {
+            background: #e8f4fd;
+            border-radius: 18px;
+            padding: 25px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(59, 130, 246, 0.1);
+        }
+        
+        .info-card-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .info-card-icon {
+            font-size: 28px;
+            color: #3b82f6;
+        }
+        
+        .info-card-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1e293b;
+        }
+        
+        .info-card-text {
+            color: #64748b;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 22px;
+            border: none;
+            border-radius: 16px;
+            font-size: 17px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            transition: all 0.3s;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            color: white;
+            box-shadow: 0 10px 25px rgba(59, 130, 246, 0.3);
+            margin-bottom: 20px;
+        }
+        
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 30px rgba(59, 130, 246, 0.4);
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #3b82f6;
+            margin: 20px 0;
+            display: none;
+        }
+        
+        .loading i {
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .result {
+            background: #1e293b;
+            color: white;
+            border-radius: 18px;
+            padding: 30px;
+            margin-top: 20px;
+            display: none;
+        }
+        
+        .result-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: #10b981;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .link-box {
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            word-break: break-all;
+            background: rgba(0, 0, 0, 0.4);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid rgba(76, 201, 240, 0.2);
+            margin-bottom: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .info-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.9);
+        }
+        
+        .info-icon {
+            color: #10b981;
+            width: 20px;
+        }
+        
+        .copy-btn {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            border: none;
+            padding: 18px;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            margin-top: 15px;
+        }
+        
+        .copy-btn:hover {
+            background: linear-gradient(135deg, #059669, #047857);
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+        
+        .status-success {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+        }
+        
+        .status-warning {
+            background: rgba(245, 158, 11, 0.2);
+            color: #f59e0b;
+        }
+        
+        .server-info {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e2e8f0;
+            color: #64748b;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🔐 VPN Сервис</h1>
-        <p>Создайте VPN ключ на 3 дня</p>
+        <div class="header">
+            <div class="logo">
+                <i class="fas fa-shield-alt logo-icon"></i>
+                <h1>VPN Сервис</h1>
+                <p>Полностью автоматическое создание ключей</p>
+            </div>
+        </div>
         
-        <button class="btn" onclick="createVPN()">Создать ключ</button>
-        
-        <div id="result" class="result"></div>
-        
-        <div id="stats" style="margin-top: 30px; padding: 15px; background: #f8f9fa; border-radius: 5px;">
-            <h3>📊 Статистика:</h3>
-            <p>Пользователей: <span id="userCount">0</span></p>
-            <p>Активных: <span id="activeCount">0</span></p>
+        <div class="content">
+            <div class="info-card">
+                <div class="info-card-header">
+                    <i class="fas fa-robot info-card-icon"></i>
+                    <div class="info-card-title">Автоматическая система</div>
+                </div>
+                <div class="info-card-text">
+                    Ключ создаётся и автоматически добавляется в Xray.
+                    Просто нажмите кнопку - система сделает всё сама.
+                </div>
+            </div>
+            
+            <button class="btn" onclick="createVPN()" id="createBtn">
+                <i class="fas fa-bolt"></i>
+                СОЗДАТЬ VPN КЛЮЧ НА 3 ДНЯ
+            </button>
+            
+            <div class="loading" id="loading">
+                <i class="fas fa-spinner"></i> Создаю ключ и добавляю в систему...
+            </div>
+            
+            <div class="result" id="result">
+                <div class="result-title">
+                    <i class="fas fa-check-circle"></i>
+                    <span id="resultTitle">VPN ключ создан!</span>
+                    <span class="status-badge" id="statusBadge"></span>
+                </div>
+                
+                <div class="info-item">
+                    <i class="fas fa-user info-icon"></i>
+                    <span>Пользователь: <strong id="resultUsername"></strong></span>
+                </div>
+                
+                <div class="info-item">
+                    <i class="fas fa-clock info-icon"></i>
+                    <span>Действует: <strong id="resultDays"></strong> дней</span>
+                </div>
+                
+                <div class="info-item">
+                    <i class="fas fa-server info-icon"></i>
+                    <span>Статус Xray: <strong id="resultXray"></strong></span>
+                </div>
+                
+                <div style="margin: 20px 0;">
+                    <strong>Скопируйте эту ссылку:</strong>
+                    <div class="link-box" id="linkBox"></div>
+                </div>
+                
+                <button class="copy-btn" onclick="copyLink()" id="copyBtn">
+                    <i class="fas fa-copy"></i>
+                    КОПИРОВАТЬ ССЫЛКУ
+                </button>
+                
+                <div style="margin-top: 20px; font-size: 13px; color: rgba(255,255,255,0.7);">
+                    <i class="fas fa-info-circle"></i>
+                    <span id="resultNote"></span>
+                </div>
+            </div>
+            
+            <div class="server-info">
+                <p><i class="fas fa-server"></i> Сервер: 82.24.110.81</p>
+                <p><i class="fas fa-bolt"></i> Протокол: VLESS + REALITY + XTLS</p>
+                <p><i class="fas fa-shield-alt"></i> Автоматическое добавление в Xray</p>
+            </div>
         </div>
     </div>
 
     <script>
-        // КОНФИГ - ИЗМЕНИ ЭТИ НАСТРОЙКИ!
-        const XUI_API_URL = 'http://82.24.110.81:54321'; // Порту 3X-UI
-        const XUI_USERNAME = 'admin'; // Логин 3X-UI
-        const XUI_PASSWORD = 'admin'; // Пароль 3X-UI
-        const INBOUND_ID = 1; // ID инбаунда в 3X-UI
+        const API_URL = 'http://82.24.110.81:9191';
         
-        // Создаёт VPN пользователя
         async function createVPN() {
-            const resultDiv = document.getElementById('result');
-            resultDiv.innerHTML = '🔄 Создаю ключ...';
-            resultDiv.style.display = 'block';
+            const btn = document.getElementById('createBtn');
+            const loading = document.getElementById('loading');
+            const result = document.getElementById('result');
+            
+            // Показываем загрузку
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> СОЗДАНИЕ...';
+            loading.style.display = 'block';
+            result.style.display = 'none';
             
             try {
-                // 1. Логинимся в 3X-UI (получаем токен)
-                const loginRes = await fetch(`${XUI_API_URL}/login`, {
+                const response = await fetch(API_URL + '/create', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
-                        username: XUI_USERNAME,
-                        password: XUI_PASSWORD
+                        username: 'user_' + Math.floor(Math.random() * 10000),
+                        days: 3
                     })
                 });
                 
-                if (!loginRes.ok) {
-                    throw new Error('Ошибка авторизации 3X-UI');
-                }
+                const data = await response.json();
                 
-                const loginData = await loginRes.json();
-                const token = loginData.token || loginData.access_token;
-                
-                // 2. Создаём пользователя
-                const username = `user_${Date.now()}`;
-                const expiryTime = Date.now() + (3 * 24 * 60 * 60 * 1000); // 3 дня
-                
-                const createRes = await fetch(`${XUI_API_URL}/api/inbounds/addClient`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({
-                        inboundId: INBOUND_ID,
-                        email: username,
-                        enable: true,
-                        expiryTime: expiryTime,
-                        totalGB: 0, // безлимит
-                        flow: "xtls-rprx-vision",
-                        limitIp: 0
-                    })
-                });
-                
-                const userData = await createRes.json();
-                
-                if (userData.success) {
-                    // 3. Формируем VLESS ссылку
-                    const vlessLink = generateVlessLink(userData);
+                if (data.success) {
+                    // Обновляем данные
+                    document.getElementById('resultTitle').textContent = data.message.split('!')[0] + '!';
+                    document.getElementById('resultUsername').textContent = data.username;
+                    document.getElementById('resultDays').textContent = data.days;
+                    document.getElementById('linkBox').textContent = data.link;
+                    document.getElementById('resultNote').textContent = data.note || '';
                     
-                    resultDiv.innerHTML = `
-                        <h3>✅ Ключ создан!</h3>
-                        <p><strong>Пользователь:</strong> ${username}</p>
-                        <p><strong>Ссылка:</strong></p>
-                        <textarea readonly style="width:100%; height:100px; margin:10px 0;">${vlessLink}</textarea>
-                        <br>
-                        <button onclick="copyToClipboard('${vlessLink}')">📋 Копировать</button>
-                    `;
+                    // Статус Xray
+                    const xrayStatus = document.getElementById('resultXray');
+                    const statusBadge = document.getElementById('statusBadge');
                     
-                    updateStats();
-                } else {
-                    throw new Error(userData.msg || 'Ошибка создания');
-                }
-                
-            } catch (error) {
-                resultDiv.innerHTML = `
-                    <h3>❌ Ошибка</h3>
-                    <p>${error.message}</p>
-                    <p>Используй запасной метод:</p>
-                    <button onclick="createFallback()">Создать без 3X-UI</button>
-                `;
-            }
-        }
-        
-        // Запасной метод (просто генерирует ссылку без API)
-        function createFallback() {
-            const username = `user_${Date.now()}`;
-            const uuid = generateUUID();
-            
-            // Параметры твоего сервера
-            const server = "82.24.110.81";
-            const pbk = "fbh5z3lWFuN5Xe_1QP7Kbi7E6lL3a3h7JUAZi6uaCnc";
-            const sni = "www.microsoft.com";
-            const sid = "2be6";
-            
-            const vlessLink = `vless://${uuid}@${server}:443?security=reality&encryption=none&pbk=${pbk}&headerType=none&fp=chrome&type=tcp&flow=xtls-rprx-vision&sni=${sni}&sid=${sid}#VPN_${username}`;
-            
-            document.getElementById('result').innerHTML = `
-                <h3>⚠️ Ключ создан (без 3X-UI)</h3>
-                <p>Добавь его вручную в панель 3X-UI</p>
-                <textarea readonly style="width:100%; height:100px; margin:10px 0;">${vlessLink}</textarea>
-                <p><strong>UUID для копирования:</strong> ${uuid}</p>
-                <button onclick="copyToClipboard('${vlessLink}')">📋 Копировать ссылку</button>
-            `;
-        }
-        
-        function generateUUID() {
-            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-                const r = Math.random() * 16 | 0;
-                const v = c === 'x' ? r : (r & 0x3 | 0x8);
-                return v.toString(16);
-            });
-        }
-        
-        function generateVlessLink(userData) {
-            // Формируем ссылку из данных 3X-UI
-            const server = "82.24.110.81";
-            const pbk = "fbh5z3lWFuN5Xe_1QP7Kbi7E6lL3a3h7JUAZi6uaCnc";
-            const sni = "www.microsoft.com";
-            const sid = "2be6";
-            const uuid = userData.id || generateUUID();
-            const username = userData.email || `user_${Date.now()}`;
-            
-            return `vless://${uuid}@${server}:443?security=reality&encryption=none&pbk=${pbk}&headerType=none&fp=chrome&type=tcp&flow=xtls-rprx-vision&sni=${sni}&sid=${sid}#VPN_${username}`;
-        }
-        
-        function copyToClipboard(text) {
-            navigator.clipboard.writeText(text);
-            alert('✅ Скопировано!');
-        }
-        
-        async function updateStats() {
-            // Получаем статистику из 3X-UI
-            try {
-                const loginRes = await fetch(`${XUI_API_URL}/login`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        username: XUI_USERNAME,
-                        password: XUI_PASSWORD
-                    })
-                });
-                
-                if (loginRes.ok) {
-                    const loginData = await loginRes.json();
-                    const token = loginData.token;
-                    
-                    const statsRes = await fetch(`${XUI_API_URL}/api/inbounds/list`, {
-                        headers: {'Authorization': `Bearer ${token}`}
-                    });
-                    
-                    const data = await statsRes.json();
-                    
-                    if (data.success) {
-                        let totalUsers = 0;
-                        let activeUsers = 0;
-                        
-                        data.obj.forEach(inbound => {
-                            inbound.clientStats.forEach(client => {
-                                totalUsers++;
-                                if (client.enable && client.expiryTime > Date.now()) {
-                                    activeUsers++;
-                                }
-                            });
-                        });
-                        
-                        document.getElementById('userCount').textContent = totalUsers;
-                        document.getElementById('activeCount').textContent = activeUsers;
+                    if (data.added_to_xray) {
+                        xrayStatus.textContent = '✅ Автоматически добавлен';
+                        xrayStatus.style.color = '#10b981';
+                        statusBadge.textContent = 'АВТОМАТИЧЕСКИ';
+                        statusBadge.className = 'status-badge status-success';
+                    } else {
+                        xrayStatus.textContent = '⚠️ Требуется ручное добавление';
+                        xrayStatus.style.color = '#f59e0b';
+                        statusBadge.textContent = 'РУЧНОЙ РЕЖИМ';
+                        statusBadge.className = 'status-badge status-warning';
                     }
+                    
+                    // Показываем результат
+                    result.style.display = 'block';
+                    
+                    // Прокручиваем к результату
+                    result.scrollIntoView({ behavior: 'smooth' });
                 }
+                
             } catch (error) {
-                console.log('Не могу обновить статистику:', error);
+                console.error('Ошибка:', error);
+                
+                // Показываем ошибку
+                document.getElementById('resultTitle').textContent = '❌ Ошибка подключения';
+                document.getElementById('resultUsername').textContent = 'error';
+                document.getElementById('resultDays').textContent = '3';
+                document.getElementById('linkBox').textContent = 'Проверьте подключение к серверу: ' + API_URL;
+                document.getElementById('resultXray').textContent = '❌ Недоступен';
+                document.getElementById('resultNote').textContent = 'Попробуйте позже или проверьте сервер';
+                
+                result.style.display = 'block';
+            } finally {
+                // Восстанавливаем кнопку
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-bolt"></i> СОЗДАТЬ VPN КЛЮЧ НА 3 ДНЯ';
+                loading.style.display = 'none';
             }
         }
         
-        // Обновляем статистику при загрузке
-        updateStats();
+        function copyLink() {
+            const link = document.getElementById('linkBox').textContent;
+            navigator.clipboard.writeText(link);
+            
+            const btn = document.getElementById('copyBtn');
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-check"></i> СКОПИРОВАНО!';
+            btn.style.background = 'linear-gradient(135deg, #059669, #047857)';
+            
+            setTimeout(() => {
+                btn.innerHTML = originalHTML;
+                btn.style.background = '';
+            }, 2000);
+        }
+        
+        // Проверяем доступность API при загрузке
+        async function checkAPI() {
+            try {
+                const response = await fetch(API_URL);
+                const data = await response.json();
+                console.log('✅ API доступен:', data);
+            } catch {
+                console.warn('⚠️ API недоступен');
+            }
+        }
+        
+        checkAPI();
     </script>
 </body>
 </html>
