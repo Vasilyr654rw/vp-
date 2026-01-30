@@ -1,36 +1,32 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VPN Bot</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-</head>
-<body>
-    <h1>🔐 Получи VPN ключ</h1>
-    <button onclick="createKey()">🎯 Создать на 3 дня</button>
-    <div id="result"></div>
+# Проверь что backend на 9191 работает
+curl http://82.24.110.81:9191/
 
-    <script>
-        const tg = window.Telegram.WebApp;
-        tg.expand();
-        
-        async function createKey() {
-            const response = await fetch('http://82.24.110.81:9192/create', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    telegram_id: tg.initDataUnsafe.user.id
-                })
-            });
-            
-            const data = await response.json();
-            document.getElementById('result').innerHTML = 
-                `<p>${data.link}</p>`;
-            
-            // Отправляем данные обратно в Telegram
-            tg.sendData(JSON.stringify(data));
-        }
-    </script>
-</body>
-</html>
+# Если нет, запусти простой backend:
+cd ~/vpn_working
+cat > simple_backend.py << 'EOF'
+from flask import Flask, jsonify
+from flask_cors import CORS
+
+app = Flask(__name__)
+CORS(app)
+
+@app.route('/')
+def home():
+    return jsonify({"status": "online", "service": "VPN Backend"})
+
+@app.route('/create', methods=['POST'])
+def create():
+    import uuid
+    return jsonify({
+        "success": True,
+        "message": "✅ Получили запрос от Telegram",
+        "uuid": str(uuid.uuid4()),
+        "status": "received"
+    })
+
+if __name__ == '__main__':
+    print("🚀 Simple Backend на порту 9191")
+    app.run(host='0.0.0.0', port=9191, debug=False)
+EOF
+
+python3 simple_backend.py &
