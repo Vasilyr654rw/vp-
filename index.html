@@ -1,32 +1,282 @@
-# Проверь что backend на 9191 работает
-curl http://82.24.110.81:9191/
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VPN Bot</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            margin: 0;
+            color: white;
+        }
+        
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        
+        h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        .btn {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 20px 40px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 15px;
+            cursor: pointer;
+            margin: 30px 0;
+            width: 100%;
+            transition: transform 0.2s;
+        }
+        
+        .btn:active {
+            transform: scale(0.98);
+        }
+        
+        .result {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 20px;
+            word-break: break-all;
+            display: none;
+        }
+        
+        .link {
+            font-family: monospace;
+            font-size: 12px;
+            background: rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+        }
+        
+        .copy-btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 10px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        
+        .debug {
+            font-size: 12px;
+            color: rgba(255,255,255,0.6);
+            margin-top: 30px;
+            padding: 10px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 10px;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 VPN Сервис</h1>
+        <p>Нажмите кнопку чтобы получить VPN ключ на 3 дня</p>
+        
+        <button class="btn" onclick="createVPN()" id="createBtn">
+            🎯 ПОЛУЧИТЬ VPN КЛЮЧ
+        </button>
+        
+        <div class="result" id="result">
+            <h3>✅ Ваш VPN ключ:</h3>
+            <div class="link" id="linkBox"></div>
+            <button class="copy-btn" onclick="copyLink()">📋 Копировать</button>
+        </div>
+        
+        <div class="debug" id="debugInfo">
+            <strong>Отладка:</strong><br>
+            Telegram WebApp: <span id="tgStatus">загружается...</span><br>
+            ID пользователя: <span id="userId">не найден</span><br>
+            API статус: <span id="apiStatus">не проверен</span>
+        </div>
+    </div>
 
-# Если нет, запусти простой backend:
-cd ~/vpn_working
-cat > simple_backend.py << 'EOF'
-from flask import Flask, jsonify
-from flask_cors import CORS
-
-app = Flask(__name__)
-CORS(app)
-
-@app.route('/')
-def home():
-    return jsonify({"status": "online", "service": "VPN Backend"})
-
-@app.route('/create', methods=['POST'])
-def create():
-    import uuid
-    return jsonify({
-        "success": True,
-        "message": "✅ Получили запрос от Telegram",
-        "uuid": str(uuid.uuid4()),
-        "status": "received"
-    })
-
-if __name__ == '__main__':
-    print("🚀 Simple Backend на порту 9191")
-    app.run(host='0.0.0.0', port=9191, debug=False)
-EOF
-
-python3 simple_backend.py &
+    <script>
+        // ===== ТЕЛЕГРАМ ИНИЦИАЛИЗАЦИЯ =====
+        let telegram = null;
+        let telegramUserId = null;
+        
+        function initTelegram() {
+            try {
+                if (window.Telegram && window.Telegram.WebApp) {
+                    telegram = window.Telegram.WebApp;
+                    
+                    // Раскрываем на весь экран
+                    telegram.expand();
+                    
+                    // Получаем данные пользователя
+                    if (telegram.initDataUnsafe && telegram.initDataUnsafe.user) {
+                        telegramUserId = telegram.initDataUnsafe.user.id;
+                        console.log('✅ Telegram user ID:', telegramUserId);
+                        
+                        document.getElementById('tgStatus').textContent = '✅ готов';
+                        document.getElementById('userId').textContent = telegramUserId;
+                        
+                        // Показываем что всё ок
+                        telegram.ready();
+                        telegram.MainButton.setText('VPN активен');
+                        telegram.MainButton.show();
+                        
+                        return true;
+                    }
+                }
+                return false;
+            } catch (error) {
+                console.error('Ошибка Telegram:', error);
+                return false;
+            }
+        }
+        
+        // ===== СОЗДАНИЕ VPN КЛЮЧА =====
+        async function createVPN() {
+            const btn = document.getElementById('createBtn');
+            const result = document.getElementById('result');
+            const debug = document.getElementById('debugInfo');
+            
+            // Показываем загрузку
+            btn.innerHTML = '🔄 Создаю ключ...';
+            btn.disabled = true;
+            
+            try {
+                // Генерируем UUID
+                const uuid = generateUUID();
+                const username = telegramUserId ? `tg_${telegramUserId}` : `user_${Date.now()}`;
+                
+                // Создаём ссылку локально (не требует API)
+                const server = "82.24.110.81";
+                const pbk = "fbh5z3lWFuN5Xe_1QP7Kbi7E6lL3a3h7JUAZi6uaCnc";
+                const sni = "www.microsoft.com";
+                const sid = "2be6";
+                
+                const vlessLink = `vless://${uuid}@${server}:443?security=reality&encryption=none&pbk=${pbk}&headerType=none&fp=chrome&type=tcp&flow=xtls-rprx-vision&sni=${sni}&sid=${sid}#VPN_${username}`;
+                
+                // Показываем результат
+                document.getElementById('linkBox').textContent = vlessLink;
+                result.style.display = 'block';
+                
+                // Прокручиваем к результату
+                result.scrollIntoView({ behavior: 'smooth' });
+                
+                // Пробуем отправить на сервер (не блокируем если не получится)
+                try {
+                    const response = await fetch('http://82.24.110.81:9191/create', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            telegram_id: telegramUserId || 'anonymous',
+                            username: username,
+                            uuid: uuid,
+                            days: 3
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        document.getElementById('apiStatus').textContent = '✅ отправлен на сервер';
+                    } else {
+                        document.getElementById('apiStatus').textContent = '⚠️ ошибка отправки';
+                    }
+                } catch (apiError) {
+                    document.getElementById('apiStatus').textContent = '⚠️ сервер недоступен';
+                    console.log('API недоступен, но ключ создан локально');
+                }
+                
+                // Закрываем Web App через 10 секунд
+                setTimeout(() => {
+                    if (telegram && telegram.close) {
+                        telegram.close();
+                    }
+                }, 10000);
+                
+            } catch (error) {
+                console.error('Ошибка:', error);
+                document.getElementById('linkBox').textContent = 'Ошибка создания: ' + error.message;
+                result.style.display = 'block';
+                document.getElementById('apiStatus').textContent = '❌ ошибка';
+            } finally {
+                // Восстанавливаем кнопку
+                btn.innerHTML = '🎯 ПОЛУЧИТЬ VPN КЛЮЧ';
+                btn.disabled = false;
+            }
+        }
+        
+        function generateUUID() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0;
+                const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+        
+        function copyLink() {
+            const link = document.getElementById('linkBox').textContent;
+            
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(link)
+                    .then(() => {
+                        alert('✅ Ссылка скопирована!');
+                    })
+                    .catch(() => {
+                        // Fallback для старых браузеров
+                        copyFallback(link);
+                    });
+            } else {
+                copyFallback(link);
+            }
+        }
+        
+        function copyFallback(text) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            alert('✅ Ссылка скопирована!');
+        }
+        
+        // ===== ЗАПУСК ПРИ ЗАГРУЗКЕ =====
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 VPN WebApp загружен');
+            
+            // Инициализируем Telegram
+            if (initTelegram()) {
+                console.log('✅ Telegram WebApp готов');
+            } else {
+                console.log('⚠️ Telegram WebApp не найден, работает в веб-режиме');
+                document.getElementById('tgStatus').textContent = '❌ не найден (веб-режим)';
+                document.getElementById('userId').textContent = 'анонимный';
+            }
+            
+            // Проверяем доступность API
+            checkAPI();
+        });
+        
+        async function checkAPI() {
+            try {
+                const response = await fetch('http://82.24.110.81:9191/', { 
+                    mode: 'no-cors',
+                    cache: 'no-cache'
+                });
+                document.getElementById('apiStatus').textContent = '✅ доступен';
+            } catch {
+                document.getElementById('apiStatus').textContent = '⚠️ недоступен (ключи создаются локально)';
+            }
+        }
+    </script>
+</body>
+</html>
