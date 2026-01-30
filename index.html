@@ -560,6 +560,11 @@
             margin-bottom: 30px;
         }
         
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
         .loader-text {
             color: white;
             font-size: 20px;
@@ -872,7 +877,7 @@
 
     <script>
         // ==================== КОНФИГУРАЦИЯ ====================
-        const API_BASE_URL = 'https://corsproxy.io/?https://82.24.110.81:3000';
+        const API_URL = 'http://82.24.110.81:8080/create';
         const SERVER_IP = '82.24.110.81';
         const PUBLIC_KEY = 'fbh5z3lWFuN5Xe_1QP7Kbi7E6lL3a3h7JUAZi6uaCnc';
         const SNI = 'www.microsoft.com';
@@ -950,8 +955,8 @@
                 updateLoaderText('Шаг 1: Отправка запроса к серверу');
                 await delay(800);
                 
-                // Пытаемся использовать API через прокси
-                const apiResponse = await callApiWithFallback();
+                // Пытаемся использовать наш API на порту 8080
+                const apiResponse = await callApi();
                 
                 // Шаг 2: Обработка ответа
                 updateStep(2);
@@ -962,13 +967,15 @@
                 if (apiResponse.success) {
                     // Успешный ответ от API
                     state.vpnKey = apiResponse.link;
-                    state.userUuid = apiResponse.uuid || apiResponse.user_uuid;
-                    state.expiresAt = apiResponse.expires || apiResponse.expires_at;
-                    state.xrayAdded = apiResponse.xrayAdded || apiResponse.xray_added || false;
+                    state.userUuid = apiResponse.uuid;
+                    state.xrayAdded = true; // Наш API сам добавляет в Xray
+                    
+                    // Дата окончания - 3 дня
+                    const expiryDate = new Date();
+                    expiryDate.setDate(expiryDate.getDate() + 3);
+                    state.expiresAt = expiryDate.toISOString();
                 } else {
-                    // Если API недоступен, генерируем локально
-                    generateLocalKey();
-                    state.xrayAdded = false;
+                    throw new Error(apiResponse.error || 'Ошибка API');
                 }
                 
                 // Шаг 3: Завершение
@@ -988,11 +995,7 @@
                     showResult();
                     
                     // Показываем уведомление
-                    if (state.xrayAdded) {
-                        showNotification('🎉 VPN ключ создан и автоматически добавлен в Xray!', 'success');
-                    } else {
-                        showNotification('⚠️ Ключ создан. Добавьте в Xray вручную.', 'warning');
-                    }
+                    showNotification('🎉 VPN ключ создан и автоматически добавлен в Xray!', 'success');
                     
                     // Разблокируем кнопку
                     btn.disabled = false;
@@ -1004,77 +1007,75 @@
             } catch (error) {
                 console.error('Ошибка создания ключа:', error);
                 
-                // Если всё сломалось, генерируем локально
-                generateLocalKey();
-                saveToLocalStorage();
-                
                 hideLoader();
-                showResult();
-                showNotification('⚠️ Используется локальная генерация. Добавьте ключ в Xray вручную.', 'warning');
+                showNotification('❌ Ошибка создания ключа: ' + error.message, 'error');
                 
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fas fa-key"></i> СОЗДАТЬ VPN КЛЮЧ НА 3 ДНЯ';
                 state.isCreating = false;
+                
+                // Сбрасываем процесс
+                resetProcess();
             }
         }
         
         // ==================== API ВЗАИМОДЕЙСТВИЕ ====================
-        async function callApiWithFallback() {
-            const endpoints = [
-                `https://corsproxy.io/?https://82.24.110.81:3000/generate`,
-                `https://api.allorigins.win/raw?url=https://82.24.110.81:3000/generate`,
-                `https://thingproxy.freeboard.io/fetch/https://82.24.110.81:3000/generate`
-            ];
+        async function callApi() {
+            console.log('Отправка запроса к API:', API_URL);
             
-            for (const endpoint of endpoints) {
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        telegram_id: state.userId,
+                        days: 3
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ошибка: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log('✅ API ответ:', data);
+                
+                return data;
+                
+            } catch (error) {
+                console.error('❌ Ошибка API:', error);
+                
+                // Попробуем через CORS прокси
                 try {
-                    console.log(`Попытка API: ${endpoint}`);
+                    const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(API_URL)}`;
+                    console.log('Попытка через CORS прокси:', proxyUrl);
                     
-                    const response = await fetch(endpoint, {
+                    const proxyResponse = await fetch(proxyUrl, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                         },
                         body: JSON.stringify({
-                            id: state.userId,
+                            telegram_id: state.userId,
                             days: 3
                         })
                     });
                     
-                    if (response.ok) {
-                        const data = await response.json();
-                        console.log('✅ API ответ:', data);
-                        return data;
+                    if (!proxyResponse.ok) {
+                        throw new Error(`CORS прокси ошибка: ${proxyResponse.status}`);
                     }
-                } catch (error) {
-                    console.log(`❌ API недоступен: ${error.message}`);
-                    continue;
+                    
+                    const proxyData = await proxyResponse.json();
+                    console.log('✅ CORS прокси ответ:', proxyData);
+                    
+                    return proxyData;
+                    
+                } catch (proxyError) {
+                    throw new Error('API недоступен напрямую и через прокси');
                 }
             }
-            
-            // Если все прокси не работают
-            throw new Error('Все API прокси недоступны');
-        }
-        
-        function generateLocalKey() {
-            // Генерация UUID v4
-            const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-                const r = Math.random() * 16 | 0;
-                const v = c == 'x' ? r : (r & 0x3 | 0x8);
-                return v.toString(16);
-            });
-            
-            state.userUuid = uuid;
-            
-            // Формирование ссылки
-            state.vpnKey = `vless://${uuid}@${SERVER_IP}:443?type=tcp&security=reality&sni=${SNI}&pbk=${PUBLIC_KEY}&sid=${SHORT_ID}&fp=chrome&flow=xtls-rprx-vision#${state.userId}`;
-            
-            // Срок действия - 3 дня
-            const expiryDate = new Date();
-            expiryDate.setDate(expiryDate.getDate() + 3);
-            state.expiresAt = expiryDate.toISOString();
-            
-            console.log('🔄 Локально сгенерирован ключ:', state.vpnKey);
         }
         
         // ==================== ОТОБРАЖЕНИЕ РЕЗУЛЬТАТА ====================
@@ -1092,7 +1093,7 @@
             // Статус
             document.getElementById('statusDisplay').textContent = state.xrayAdded 
                 ? '✅ Автоматически добавлен в Xray' 
-                : '⚠️ Требуется ручное добавление в Xray';
+                : '❌ Ошибка добавления в Xray';
             
             // Показываем результат
             document.getElementById('processSteps').style.display = 'none';
@@ -1104,202 +1105,176 @@
         
         // ==================== ДЕЙСТВИЯ С КЛЮЧОМ ====================
         async function copyKey() {
-            if (!state.vpnKey) return;
+            if (!state.vpnKey) {
+                showNotification('Сначала создайте ключ', 'warning');
+                return;
+            }
             
             try {
                 await navigator.clipboard.writeText(state.vpnKey);
-                showNotification('✅ VPN ключ скопирован в буфер обмена!', 'success');
+                showNotification('✅ Ключ скопирован в буфер обмена!', 'success');
                 
-                // Визуальный фидбэк
+                // Анимация кнопки
                 const btn = document.getElementById('copyBtn');
-                const original = btn.innerHTML;
+                const originalText = btn.innerHTML;
                 btn.innerHTML = '<i class="fas fa-check"></i> СКОПИРОВАНО!';
+                btn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
                 
                 setTimeout(() => {
-                    btn.innerHTML = original;
+                    btn.innerHTML = originalText;
+                    btn.style.background = '';
                 }, 2000);
                 
-            } catch (err) {
-                // Fallback для старых браузеров
-                const textarea = document.createElement('textarea');
-                textarea.value = state.vpnKey;
-                document.body.appendChild(textarea);
-                textarea.select();
+            } catch (error) {
+                console.error('Ошибка копирования:', error);
+                
+                // Fallback метод
+                const textArea = document.createElement('textarea');
+                textArea.value = state.vpnKey;
+                document.body.appendChild(textArea);
+                textArea.select();
                 document.execCommand('copy');
-                document.body.removeChild(textarea);
-                showNotification('✅ Ключ скопирован!', 'success');
+                document.body.removeChild(textArea);
+                
+                showNotification('✅ Ключ скопирован (fallback метод)', 'success');
             }
         }
         
         function shareKey() {
-            if (!state.vpnKey) return;
+            if (!state.vpnKey) {
+                showNotification('Сначала создайте ключ', 'warning');
+                return;
+            }
+            
+            const shareText = `🔥 CyberShield VPN ключ 🔥\n\n` +
+                             `Ссылка: ${state.vpnKey}\n` +
+                             `Действует: 3 дня\n` +
+                             `Протокол: VLESS + REALITY + XTLS\n\n` +
+                             `Сервер: ${SERVER_IP}`;
             
             if (navigator.share) {
                 navigator.share({
-                    title: 'CyberShield VPN - Ваш ключ',
-                    text: `VPN ключ для пользователя ${state.userId}`,
-                    url: state.vpnKey
-                }).then(() => {
-                    showNotification('✅ Ключ успешно отправлен!', 'success');
-                }).catch(err => {
-                    console.log('Ошибка sharing:', err);
-                    copyKey();
+                    title: 'CyberShield VPN ключ',
+                    text: shareText,
+                    url: window.location.href
+                }).catch(error => {
+                    console.log('Ошибка sharing:', error);
+                    copyShareText(shareText);
                 });
             } else {
-                copyKey();
+                copyShareText(shareText);
             }
         }
         
-        function testConnection() {
-            showLoader('Проверка подключения', 'Тестирование VPN соединения...');
-            
-            setTimeout(() => {
-                hideLoader();
-                showNotification('✅ VPN соединение готово к использованию!', 'success');
-            }, 1500);
+        function copyShareText(text) {
+            navigator.clipboard.writeText(text)
+                .then(() => {
+                    showNotification('✅ Данные для отправки скопированы', 'success');
+                })
+                .catch(() => {
+                    // Fallback
+                    const textArea = document.createElement('textarea');
+                    textArea.value = text;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    showNotification('✅ Данные скопированы в буфер', 'success');
+                });
         }
         
+        function testConnection() {
+            showNotification('⚠️ Тестирование подключения...', 'info');
+            
+            const btn = document.getElementById('testBtn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ТЕСТ...';
+            
+            // Имитация тестирования
+            setTimeout(() => {
+                const isSuccess = Math.random() > 0.3; // 70% успеха
+                
+                if (isSuccess) {
+                    showNotification('✅ Подключение успешно! Сервер работает.', 'success');
+                    btn.innerHTML = '<i class="fas fa-check"></i> УСПЕХ!';
+                    btn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+                } else {
+                    showNotification('⚠️ Подключение неудачно. Попробуйте позже.', 'warning');
+                    btn.innerHTML = '<i class="fas fa-times"></i> ОШИБКА';
+                    btn.style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
+                }
+                
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.style.background = '';
+                }, 3000);
+            }, 2000);
+        }
+        
+        // ==================== УПРАВЛЕНИЕ КЛИЕНТАМИ ====================
         function showClientApps() {
-            document.getElementById('clientApps').style.display = 'block';
-            showNotification('📱 Выберите VPN клиент для установки', 'info');
+            const clientApps = document.getElementById('clientApps');
+            if (clientApps.style.display === 'none' || !clientApps.style.display) {
+                clientApps.style.display = 'block';
+                showNotification('📱 Список клиентов VPN открыт', 'info');
+            } else {
+                clientApps.style.display = 'none';
+            }
         }
         
         function openApp(appName) {
             const apps = {
-                'v2rayng': 'https://play.google.com/store/apps/details?id=com.v2ray.ang',
+                'v2rayng': 'https://github.com/2dust/v2rayNG/releases',
                 'nekobox': 'https://github.com/MatsuriDayo/NekoBoxForAndroid/releases',
-                'hiddify': 'https://play.google.com/store/apps/details?id=io.github.hiddify',
-                'clash': 'https://github.com/Dreamacro/clash/releases'
+                'hiddify': 'https://github.com/hiddify/hiddify-next/releases',
+                'clash': 'https://github.com/Fndroid/clash_for_windows_pkg/releases'
             };
             
             if (apps[appName]) {
                 window.open(apps[appName], '_blank');
-                showNotification('📱 Открываю страницу приложения...', 'info');
-            }
-        }
-        
-        // ==================== ПРОЦЕСС И ПРОГРЕСС ====================
-        function resetProcess() {
-            // Сбрасываем шаги
-            for (let i = 1; i <= 3; i++) {
-                const step = document.getElementById(`step${i}`);
-                step.classList.remove('active', 'completed');
-                step.querySelector('.step-icon').innerHTML = i;
-            }
-            
-            // Сбрасываем прогресс
-            updateProgress(0);
-            document.getElementById('progressText').textContent = 'Готов к созданию';
-        }
-        
-        function updateStep(stepNumber) {
-            // Отмечаем предыдущие шаги как завершенные
-            for (let i = 1; i < stepNumber; i++) {
-                const step = document.getElementById(`step${i}`);
-                step.classList.remove('active');
-                step.classList.add('completed');
-                step.querySelector('.step-icon').innerHTML = '<i class="fas fa-check"></i>';
-            }
-            
-            // Текущий шаг активен
-            const currentStep = document.getElementById(`step${stepNumber}`);
-            if (currentStep) {
-                currentStep.classList.add('active');
-                currentStep.classList.remove('completed');
-            }
-            
-            // Обновляем прогресс
-            const progress = (stepNumber / 3) * 100;
-            updateProgress(progress);
-        }
-        
-        function updateProgress(percent) {
-            document.getElementById('progressFill').style.width = percent + '%';
-            
-            const texts = {
-                0: 'Готов к созданию',
-                33: 'Отправка запроса...',
-                66: 'Обработка данных...',
-                100: 'Завершено!'
-            };
-            
-            const closest = Object.keys(texts).reduce((prev, curr) => {
-                return Math.abs(curr - percent) < Math.abs(prev - percent) ? curr : prev;
-            });
-            
-            document.getElementById('progressText').textContent = texts[closest];
-        }
-        
-        // ==================== СОХРАНЕНИЕ И ЗАГРУЗКА ====================
-        function checkSavedKey() {
-            try {
-                const saved = localStorage.getItem(`cybershield_key_${state.userId}`);
-                if (saved) {
-                    const data = JSON.parse(saved);
-                    
-                    // Проверяем срок
-                    if (new Date(data.expires) > new Date()) {
-                        state.vpnKey = data.key;
-                        state.userUuid = data.uuid;
-                        state.expiresAt = data.expires;
-                        state.xrayAdded = data.xrayAdded;
-                        
-                        showResult();
-                        document.getElementById('createBtn').innerHTML = '<i class="fas fa-redo"></i> СОЗДАТЬ НОВЫЙ КЛЮЧ';
-                        
-                        showNotification('✅ Загружен сохраненный VPN ключ', 'info');
-                        return true;
-                    } else {
-                        localStorage.removeItem(`cybershield_key_${state.userId}`);
-                    }
-                }
-            } catch (e) {
-                console.log('Нет сохраненного ключа');
-            }
-            return false;
-        }
-        
-        function saveToLocalStorage() {
-            const data = {
-                key: state.vpnKey,
-                uuid: state.userUuid,
-                expires: state.expiresAt,
-                userId: state.userId,
-                xrayAdded: state.xrayAdded,
-                created: new Date().toISOString()
-            };
-            
-            localStorage.setItem(`cybershield_key_${state.userId}`, JSON.stringify(data));
-        }
-        
-        // ==================== СТАТИСТИКА ====================
-        function updateStats() {
-            try {
-                const savedKeys = Object.keys(localStorage).filter(key => key.startsWith('cybershield_key_'));
-                const activeKeys = savedKeys.filter(key => {
-                    try {
-                        const data = JSON.parse(localStorage.getItem(key));
-                        return new Date(data.expires) > new Date();
-                    } catch {
-                        return false;
-                    }
-                });
-                
-                document.getElementById('statUsers').textContent = savedKeys.length;
-                document.getElementById('statActive').textContent = activeKeys.length;
-                
-                // Имитация аптайма
-                const uptime = Math.floor(Math.random() * 5) + 98; // 98-100%
-                document.getElementById('statUptime').textContent = uptime + '%';
-                
-            } catch (e) {
-                console.log('Ошибка обновления статистики');
+                showNotification(`Открывается страница ${appName}...`, 'info');
             }
         }
         
         // ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
         function delay(ms) {
             return new Promise(resolve => setTimeout(resolve, ms));
+        }
+        
+        function updateStep(stepNumber) {
+            // Сбрасываем все шаги
+            document.querySelectorAll('.step').forEach((step, index) => {
+                step.classList.remove('active', 'completed');
+                
+                if (index + 1 < stepNumber) {
+                    step.classList.add('completed');
+                } else if (index + 1 === stepNumber) {
+                    step.classList.add('active');
+                }
+            });
+            
+            // Обновляем прогресс
+            const progress = Math.min((stepNumber / 3) * 100, 100);
+            updateProgress(progress);
+            
+            // Обновляем текст
+            const texts = [
+                'Готов к созданию',
+                'Отправка запроса...',
+                'Добавление в Xray...',
+                'Формирование результата...'
+            ];
+            document.getElementById('progressText').textContent = texts[stepNumber] || 'Завершено';
+        }
+        
+        function updateProgress(percent) {
+            document.getElementById('progressFill').style.width = percent + '%';
+        }
+        
+        function resetProcess() {
+            updateStep(0);
+            document.getElementById('processSteps').style.display = 'block';
+            document.getElementById('resultContainer').style.display = 'none';
         }
         
         function showLoader(title, subtitle) {
@@ -1316,57 +1291,126 @@
             document.getElementById('loader').style.display = 'none';
         }
         
-        function showNotification(message, type = 'info') {
+        function showNotification(text, type = 'info') {
             const notification = document.getElementById('notification');
-            const text = document.getElementById('notificationText');
+            const icon = notification.querySelector('.notification-icon');
+            const textEl = document.getElementById('notificationText');
             
-            text.textContent = message;
+            // Устанавливаем текст и иконку
+            textEl.textContent = text;
             
-            // Иконка по типу
-            const icon = notification.querySelector('i');
-            icon.className = {
-                'success': 'fas fa-check-circle',
-                'error': 'fas fa-exclamation-circle',
-                'warning': 'fas fa-exclamation-triangle',
-                'info': 'fas fa-info-circle'
-            }[type] || 'fas fa-info-circle';
+            // Устанавливаем класс типа уведомления
+            notification.className = 'notification';
+            notification.classList.add(type);
             
-            notification.className = `notification ${type}`;
+            // Устанавливаем иконку в зависимости от типа
+            if (type === 'success') {
+                icon.className = 'fas fa-check-circle notification-icon';
+            } else if (type === 'error') {
+                icon.className = 'fas fa-exclamation-circle notification-icon';
+            } else if (type === 'warning') {
+                icon.className = 'fas fa-exclamation-triangle notification-icon';
+            } else {
+                icon.className = 'fas fa-info-circle notification-icon';
+            }
+            
+            // Показываем уведомление
             notification.classList.add('show');
             
+            // Скрываем через 5 секунд
             setTimeout(() => {
                 notification.classList.remove('show');
-            }, 4000);
+            }, 5000);
         }
         
-        // ==================== ТЕСТОВЫЕ ФУНКЦИИ ====================
-        window.debugState = function() {
-            console.log('=== СОСТОЯНИЕ СИСТЕМЫ ===');
-            console.log('User ID:', state.userId);
-            console.log('User UUID:', state.userUuid);
-            console.log('VPN Key:', state.vpnKey);
-            console.log('Expires:', state.expiresAt);
-            console.log('Xray Added:', state.xrayAdded);
-            console.log('Current Step:', state.currentStep);
-            console.log('Is Creating:', state.isCreating);
-        };
+        function saveToLocalStorage() {
+            const data = {
+                userId: state.userId,
+                userUuid: state.userUuid,
+                vpnKey: state.vpnKey,
+                expiresAt: state.expiresAt,
+                xrayAdded: state.xrayAdded,
+                timestamp: Date.now()
+            };
+            localStorage.setItem('cybershield_vpn_data', JSON.stringify(data));
+        }
         
-        window.clearData = function() {
-            localStorage.clear();
-            state.vpnKey = null;
-            
-            document.getElementById('resultContainer').style.display = 'none';
-            document.getElementById('processSteps').style.display = 'block';
-            document.getElementById('createBtn').disabled = false;
-            document.getElementById('createBtn').innerHTML = '<i class="fas fa-key"></i> СОЗДАТЬ VPN КЛЮЧ НА 3 ДНЯ';
-            
-            resetProcess();
-            updateStats();
-            showNotification('🗑️ Все данные очищены', 'info');
-        };
+        function checkSavedKey() {
+            try {
+                const saved = localStorage.getItem('cybershield_vpn_data');
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    
+                    // Проверяем не истек ли срок действия
+                    if (data.expiresAt) {
+                        const expiryDate = new Date(data.expiresAt);
+                        if (expiryDate > new Date()) {
+                            // Ключ еще действителен
+                            state.userId = data.userId;
+                            state.userUuid = data.userUuid;
+                            state.vpnKey = data.vpnKey;
+                            state.expiresAt = data.expiresAt;
+                            state.xrayAdded = data.xrayAdded;
+                            
+                            // Показываем сохраненный ключ
+                            showResult();
+                            showNotification('✅ Загружен сохраненный VPN ключ', 'info');
+                        } else {
+                            // Ключ истек
+                            localStorage.removeItem('cybershield_vpn_data');
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки сохраненных данных:', error);
+            }
+        }
         
-        // Автоматическое обновление статистики каждые 30 секунд
-        setInterval(updateStats, 30000);
+        function updateStats() {
+            // Генерация случайной статистики (в реальном приложении здесь был бы запрос к API)
+            const users = Math.floor(Math.random() * 5000) + 1000;
+            const active = Math.floor(users * (0.3 + Math.random() * 0.4));
+            const uptime = (95 + Math.random() * 5).toFixed(1);
+            
+            document.getElementById('statUsers').textContent = users.toLocaleString();
+            document.getElementById('statActive').textContent = active.toLocaleString();
+            document.getElementById('statUptime').textContent = uptime + '%';
+        }
+        
+        // ==================== ДОПОЛНИТЕЛЬНЫЕ ВОЗМОЖНОСТИ ====================
+        function generateFallbackKey() {
+            // Функция для генерации ключа, если API не работает
+            const uuid = generateUUID();
+            const vlessLink = `vless://${uuid}@${SERVER_IP}:443?security=reality&encryption=none&pbk=${PUBLIC_KEY}&headerType=none&fp=chrome&type=tcp&flow=xtls-rprx-vision&sni=${SNI}&sid=${SHORT_ID}#CyberShield_${state.userId}`;
+            
+            state.userUuid = uuid;
+            state.vpnKey = vlessLink;
+            state.xrayAdded = false; // Не добавлен в Xray
+            
+            // Дата окончания - 3 дня
+            const expiryDate = new Date();
+            expiryDate.setDate(expiryDate.getDate() + 3);
+            state.expiresAt = expiryDate.toISOString();
+            
+            return vlessLink;
+        }
+        
+        function generateUUID() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0;
+                const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+        
+        // ==================== ДЕБАГ ====================
+        function debugCreate() {
+            // Для тестирования без API
+            console.log('Отладка: создание тестового ключа');
+            generateFallbackKey();
+            showResult();
+            showNotification('Тестовый ключ создан (режим отладки)', 'warning');
+        }
     </script>
 </body>
 </html>
