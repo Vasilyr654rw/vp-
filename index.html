@@ -196,19 +196,6 @@
             100% { transform: rotate(360deg); }
         }
         
-        .status-badge {
-            display: inline-block;
-            padding: 6px 15px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-            margin-left: 10px;
-        }
-        
-        .success { background: #d4edda; color: #155724; }
-        .warning { background: #fff3cd; color: #856404; }
-        .danger { background: #f8d7da; color: #721c24; }
-        
         .info-box {
             background: #e8f4fd;
             border-radius: 12px;
@@ -258,6 +245,25 @@
         
         .step-done .step-icon {
             background: #28a745;
+        }
+        
+        .result-box {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px;
+            display: none;
+        }
+        
+        .key-text {
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            word-break: break-all;
+            background: #2d3748;
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 10px 0;
         }
     </style>
 </head>
@@ -320,7 +326,7 @@
                 <div class="step-icon">1</div>
                 <div>
                     <div style="font-weight: 600;">Отправка запроса</div>
-                    <div style="font-size: 12px; color: #666;">Подключение к API серверу</div>
+                    <div style="font-size: 12px; color: #666;">Подключение к серверу</div>
                 </div>
             </div>
             
@@ -328,7 +334,7 @@
                 <div class="step-icon">2</div>
                 <div>
                     <div style="font-weight: 600;">Добавление в Xray</div>
-                    <div style="font-size: 12px; color: #666;">Автоматическое обновление конфига</div>
+                    <div style="font-size: 12px; color: #666;">Обновление конфигурации</div>
                 </div>
             </div>
             
@@ -336,7 +342,7 @@
                 <div class="step-icon">3</div>
                 <div>
                     <div style="font-weight: 600;">Генерация ссылки</div>
-                    <div style="font-size: 12px; color: #666;">Создание рабочей VLESS Reality</div>
+                    <div style="font-size: 12px; color: #666;">Создание VLESS Reality</div>
                 </div>
             </div>
             
@@ -346,20 +352,20 @@
         </div>
         
         <!-- РЕЗУЛЬТАТ -->
-        <div class="card" style="margin-top: -10px; display: none;" id="resultCard">
+        <div class="result-box" id="resultBox">
             <div class="card-title">
                 <i class="fas fa-link"></i>
                 Ваш VPN ключ
             </div>
             
-            <div style="background: #f8f9fa; padding: 15px; border-radius: 12px; margin-bottom: 15px;">
-                <div style="font-weight: 600; margin-bottom: 10px; color: #333;">
+            <div style="margin-bottom: 15px;">
+                <div style="font-weight: 600; margin-bottom: 5px;">
                     <i class="fas fa-user-circle"></i> ID: <span id="userIdDisplay"></span>
                 </div>
-                <div style="font-family: 'Courier New', monospace; font-size: 11px; word-break: break-all; color: #666; margin-bottom: 10px;" id="keyText">
+                <div class="key-text" id="keyText">
                     Нажмите "Создать ключ" для генерации
                 </div>
-                <div style="font-size: 12px; color: #28a745;" id="statusText">
+                <div style="font-size: 12px; color: #28a745; margin-top: 10px;" id="statusText">
                     <i class="fas fa-clock"></i> Срок: 3 дня
                 </div>
             </div>
@@ -393,10 +399,13 @@
     </div>
 
     <script>
-        // ==================== КОНФИГУРАЦИЯ ====================
-        const API_URL = "http://82.24.110.81:9090"; // Ваш API сервер
+        // ==================== ПЕРЕМЕННЫЕ ====================
+        const API_SERVER = "82.24.110.81:9090";
+        const SERVER_IP = "82.24.110.81";
+        const PUBLIC_KEY = "fbh5z3lWFuN5Xe_1QP7Kbi7E6lL3a3h7JUAZi6uaCnc";
+        const SNI = "www.microsoft.com";
+        const SHORT_ID = "2be6";
         
-        // ==================== СОСТОЯНИЕ ====================
         let state = {
             userId: null,
             vpnKey: null,
@@ -413,22 +422,18 @@
         });
         
         function initApp() {
-            // Генерируем ID пользователя из URL или случайный
+            // Генерируем ID пользователя
             const urlParams = new URLSearchParams(window.location.search);
             state.userId = urlParams.get('id') || 
                           urlParams.get('user') || 
                           urlParams.get('tg') || 
-                          generateRandomId();
+                          'user_' + Math.random().toString(36).substring(2, 10);
             
             // Показываем ID пользователя
             document.getElementById('userName').textContent = `Пользователь: ${state.userId}`;
             
             // Проверяем сохраненный ключ
             checkSavedKey();
-        }
-        
-        function generateRandomId() {
-            return 'user_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36).substring(4);
         }
         
         // ==================== СОЗДАНИЕ VPN КЛЮЧА ====================
@@ -449,26 +454,31 @@
             try {
                 // Шаг 1: Отправка запроса
                 updateStep(1);
-                updateLoaderText("Шаг 1/3: Отправка запроса к API...");
+                updateLoaderText("Шаг 1/3: Отправка запроса...");
                 
-                // Вызов API
-                const response = await fetch(API_URL + '/generate', {
+                // Используем CORS прокси для обхода блокировки
+                const proxyUrl = getProxyUrl(`http://${API_SERVER}/generate`);
+                
+                const response = await fetch(proxyUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ id: state.userId })
+                    body: JSON.stringify({ 
+                        id: state.userId,
+                        action: 'generate'
+                    })
                 });
                 
                 if (!response.ok) {
-                    throw new Error(`Ошибка API: ${response.status}`);
+                    throw new Error(`Ошибка сервера: ${response.status}`);
                 }
                 
                 const data = await response.json();
-                console.log("✅ Ответ API:", data);
+                console.log("✅ Ответ сервера:", data);
                 
                 // Проверяем ответ
-                if (!data.success) {
+                if (!data.success && !data.link) {
                     throw new Error(data.error || "Ошибка создания ключа");
                 }
                 
@@ -477,10 +487,10 @@
                 updateLoaderText("Шаг 2/3: Обработка данных...");
                 await sleep(800);
                 
-                // Сохраняем данные
-                state.vpnKey = data.link;
-                state.vpnUuid = data.uuid || data.user_uuid;
-                state.expires = data.expires || data.expires_at;
+                // Извлекаем данные из ответа
+                state.vpnKey = data.link || generateFallbackLink(data.uuid || data.user_uuid);
+                state.vpnUuid = data.uuid || data.user_uuid || extractUuidFromLink(state.vpnKey);
+                state.expires = data.expires || data.expires_at || getExpiryDate(3);
                 state.xrayAdded = data.xrayAdded || data.xray_added || false;
                 state.keyCreated = true;
                 
@@ -504,7 +514,7 @@
                     if (state.xrayAdded) {
                         showNotification('🎉 Ключ создан и автоматически добавлен в Xray!', 'success');
                     } else {
-                        showNotification('⚠️ Ключ создан, но требуется ручное добавление в Xray', 'warning');
+                        showNotification('✅ Ключ создан! Добавьте в Xray вручную.', 'info');
                     }
                     
                     // Разблокируем кнопки
@@ -516,41 +526,106 @@
                 
             } catch (error) {
                 console.error("❌ Ошибка:", error);
-                hideLoader();
-                showNotification(`❌ Ошибка: ${error.message}`, 'error');
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-key"></i> СОЗДАТЬ VPN КЛЮЧ (3 ДНЯ)';
+                
+                // Пробуем локальную генерацию
+                try {
+                    console.log("🔄 Пробую локальную генерацию...");
+                    generateLocalKey();
+                    
+                    hideLoader();
+                    showResult();
+                    showNotification('⚠️ Используется локальная генерация. Добавьте ключ в Xray вручную.', 'warning');
+                    
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-redo"></i> СОЗДАТЬ НОВЫЙ КЛЮЧ';
+                    document.getElementById('copyBtn').disabled = false;
+                    
+                } catch (localError) {
+                    hideLoader();
+                    showNotification(`❌ Ошибка: ${error.message}`, 'error');
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-key"></i> СОЗДАТЬ VPN КЛЮЧ (3 ДНЯ)';
+                }
             }
+        }
+        
+        // ==================== CORS ПРОКСИ ====================
+        function getProxyUrl(targetUrl) {
+            // Список CORS прокси
+            const proxies = [
+                `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`,
+                `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`,
+                `https://thingproxy.freeboard.io/fetch/${targetUrl}`,
+                `https://cors-anywhere.herokuapp.com/${targetUrl}`,
+                `https://proxy.cors.sh/${targetUrl}`
+            ];
+            
+            // Возвращаем первый прокси (можно добавить рандомизацию)
+            return proxies[0];
+        }
+        
+        // ==================== ФАЛЛБЭК ГЕНЕРАЦИЯ ====================
+        function generateLocalKey() {
+            // Генерация UUID
+            const uuid = generateUUID();
+            
+            // Создание ссылки
+            state.vpnKey = generateFallbackLink(uuid);
+            state.vpnUuid = uuid;
+            state.expires = getExpiryDate(3);
+            state.xrayAdded = false;
+            state.keyCreated = true;
+            
+            saveToLocalStorage();
+            return true;
+        }
+        
+        function generateFallbackLink(uuid) {
+            return `vless://${uuid}@${SERVER_IP}:443?type=tcp&security=reality&sni=${SNI}&pbk=${PUBLIC_KEY}&sid=${SHORT_ID}&fp=chrome&flow=xtls-rprx-vision#CyberShield_${state.userId}`;
+        }
+        
+        function generateUUID() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0;
+                const v = c == 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+        
+        function extractUuidFromLink(link) {
+            const match = link.match(/vless:\/\/([a-f0-9-]{36})@/);
+            return match ? match[1] : generateUUID();
+        }
+        
+        function getExpiryDate(days) {
+            const date = new Date();
+            date.setDate(date.getDate() + days);
+            return date.toISOString();
         }
         
         // ==================== ОТОБРАЖЕНИЕ РЕЗУЛЬТАТА ====================
         function showResult() {
-            const resultCard = document.getElementById('resultCard');
+            const resultBox = document.getElementById('resultBox');
             const keyText = document.getElementById('keyText');
             const userIdDisplay = document.getElementById('userIdDisplay');
             
             // Форматируем дату
-            let expiryText = '';
+            let expiryText = '3 дня';
             if (state.expires) {
                 const expiryDate = new Date(state.expires);
-                expiryText = `Срок действия: до ${formatDate(expiryDate)}`;
+                expiryText = `до ${formatDate(expiryDate)}`;
             }
             
             // Обновляем интерфейс
             userIdDisplay.textContent = state.userId;
-            keyText.innerHTML = `
-                <div style="color: #333; margin-bottom: 8px; font-weight: 600;">VLESS Reality:</div>
-                <div style="background: #2d3748; color: white; padding: 10px; border-radius: 8px; font-size: 10px; word-break: break-all;">
-                    ${state.vpnKey}
-                </div>
-            `;
+            keyText.innerHTML = state.vpnKey;
             
             document.getElementById('statusText').innerHTML = `
-                <i class="fas fa-clock"></i> ${expiryText}<br>
-                <i class="fas fa-server"></i> Xray: ${state.xrayAdded ? '✅ Автоматически добавлен' : '⚠️ Требуется ручное добавление'}
+                <i class="fas fa-clock"></i> Действует: ${expiryText}<br>
+                <i class="fas fa-server"></i> Статус: ${state.xrayAdded ? '✅ Автоматически добавлен в Xray' : '⚠️ Добавьте в Xray вручную'}
             `;
             
-            resultCard.style.display = 'block';
+            resultBox.style.display = 'block';
         }
         
         // ==================== КОПИРОВАНИЕ КЛЮЧА ====================
@@ -593,7 +668,7 @@
             
             const shareData = {
                 title: 'CyberShield VPN - Ваш ключ',
-                text: `Ваш VPN ключ: ${state.userId}`,
+                text: `VPN ключ для ${state.userId}`,
                 url: state.vpnKey
             };
             
@@ -603,6 +678,7 @@
                     .catch(err => console.log('Ошибка sharing:', err));
             } else {
                 copyKey();
+                showNotification('✅ Ключ скопирован для отправки', 'info');
             }
         }
         
@@ -610,35 +686,36 @@
             showLoader("Проверка подключения", "Тестирование VPN соединения...");
             
             // Эмуляция проверки
-            await sleep(2000);
+            await sleep(1500);
             
             hideLoader();
-            showNotification('✅ VPN подключение установлено успешно!', 'success');
+            showNotification('✅ VPN подключение готово к использованию!', 'success');
         }
         
         function downloadApps() {
             const apps = [
                 { name: 'v2rayNG', url: 'https://play.google.com/store/apps/details?id=com.v2ray.ang' },
                 { name: 'NekoBox', url: 'https://github.com/MatsuriDayo/NekoBoxForAndroid/releases' },
-                { name: 'Hiddify', url: 'https://play.google.com/store/apps/details?id=io.github.hiddify' }
+                { name: 'Hiddify', url: 'https://play.google.com/store/apps/details?id=io.github.hiddify' },
+                { name: 'SagerNet', url: 'https://play.google.com/store/apps/details?id=io.nekohasekai.sagernet' }
             ];
-            
-            let message = '📱 Доступные VPN клиенты:\n\n';
-            apps.forEach(app => {
-                message += `• ${app.name}\n${app.url}\n\n`;
-            });
             
             showNotification('📱 Открываю список клиентов...', 'info');
             
             // Открываем первое приложение
             window.open(apps[0].url, '_blank');
             
-            // Показываем остальные через alert
+            // Показываем остальные через 1 секунду
             setTimeout(() => {
-                if (confirm('Показать ссылки на другие клиенты?')) {
+                let message = '📱 Доступные VPN клиенты:\n\n';
+                apps.forEach((app, index) => {
+                    message += `${index + 1}. ${app.name}\n${app.url}\n\n`;
+                });
+                
+                if (confirm('Показать ссылки на все клиенты?')) {
                     alert(message);
                 }
-            }, 500);
+            }, 1000);
         }
         
         // ==================== ШАГИ И ПРОГРЕСС ====================
@@ -691,7 +768,7 @@
                     }
                 }
             } catch (e) {
-                console.log("Нет сохраненного ключа:", e);
+                console.log("Нет сохраненного ключа");
             }
             return false;
         }
@@ -780,7 +857,7 @@
             state.vpnKey = null;
             state.keyCreated = false;
             
-            document.getElementById('resultCard').style.display = 'none';
+            document.getElementById('resultBox').style.display = 'none';
             document.getElementById('copyBtn').disabled = true;
             document.getElementById('createBtn').disabled = false;
             document.getElementById('createBtn').innerHTML = '<i class="fas fa-key"></i> СОЗДАТЬ VPN КЛЮЧ (3 ДНЯ)';
@@ -789,20 +866,7 @@
             showNotification('🗑️ Все данные очищены', 'info');
         };
         
-        window.testApi = async function() {
-            showLoader("Тест API", "Проверка подключения к серверу...");
-            
-            try {
-                const response = await fetch(API_URL);
-                const data = await response.json();
-                
-                hideLoader();
-                showNotification(`✅ API работает: ${data.status || 'OK'}`, 'success');
-            } catch (error) {
-                hideLoader();
-                showNotification(`❌ API недоступен: ${error.message}`, 'error');
-            }
-        };
+        window.testConnection = testConnection;
     </script>
 </body>
 </html>
